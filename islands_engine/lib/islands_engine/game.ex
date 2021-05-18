@@ -27,6 +27,9 @@ defmodule IslandsEngine.Game do
   @doc """
   trigger by send/2 in init/1,
   check the :game_state table for any state stored under the first player's name
+
+  when a genserver process time out, it will receive a :timeout message
+  this function handles that message and return a :stop tuple
   """
   def handle_info({:set_state, name}, _state) do
     state = case :ets.lookup(:game_state, name) do
@@ -37,10 +40,6 @@ defmodule IslandsEngine.Game do
     {:noreply, state, @timeout}
   end
 
-  @doc """
-  when a genserver process time out, it will receive a :timeout message
-  this function handles that message and return a :stop tuple
-  """
   def handle_info(:timeout, state) do
     {:stop, {:shutdown, :timeout}, state}
   end
@@ -72,11 +71,6 @@ defmodule IslandsEngine.Game do
     end
   end
 
-  @doc """
-    handle messages of key for island type, row and column number for the upper-left coordinate sent by front-end
-  """
-  def position_island(game, player, key, row, col) when player in @players, do: GenServer.call(game, {:position_island, player, key, row, col})
-
   def handle_call({:position_island, player, key, row, col}, _from, state) do
     board = player_board(state, player)
     with {:ok, rules} <- Rules.check(state.rules, {:position_islands, player}),
@@ -96,11 +90,6 @@ defmodule IslandsEngine.Game do
     end
   end
 
-  @doc """
-  set the player's island set, and return player's board
-  """
-  def set_islands(game, player) when player in @players, do: GenServer.call(game, {:set_islands, player})
-
   def handle_call({:set_islands, player}, _from, state) do
     board = player_board(state, player)
     with {:ok, rules} <- Rules.check(state.rules, {:set_islands, player}),
@@ -114,8 +103,6 @@ defmodule IslandsEngine.Game do
       false -> reply_error(state, {:error, :not_all_islands_positioned})
     end
   end
-
-  def guess_coordinate(game, player, row, col) when player in @players, do: GenServer.call(game, {:guess_coordinate, player, row, col})
 
   def handle_call({:guess_coordinate, player, row, col}, _from, state) do
     opponent = opponent(player)
@@ -137,6 +124,17 @@ defmodule IslandsEngine.Game do
     end
   end
 
+  @doc """
+    handle messages of key for island type, row and column number for the upper-left coordinate sent by front-end
+  """
+  def position_island(game, player, key, row, col) when player in @players, do: GenServer.call(game, {:position_island, player, key, row, col})
+
+  @doc """
+  set the player's island set, and return player's board
+  """
+  def set_islands(game, player) when player in @players, do: GenServer.call(game, {:set_islands, player})
+
+  def guess_coordinate(game, player, row, col) when player in @players, do: GenServer.call(game, {:guess_coordinate, player, row, col})
 
   #update player's name in the state data
   defp update_player2_name(state, name), do: put_in(state.player2.name, name)
@@ -175,5 +173,4 @@ defmodule IslandsEngine.Game do
     player2 = %{name: nil, board: Board.new(), guesses: Guesses.new()}
     %{player1: player1, player2: player2, rules: Rules.new()}
   end
-
 end
